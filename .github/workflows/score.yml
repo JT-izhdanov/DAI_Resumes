@@ -1,0 +1,44 @@
+name: Score résumés
+
+# Manually-triggered scoring run. Pick a role; this scores every résumé in
+# roles/<role>/resumes/ against criteria/<role>.yaml and uploads the ranking
+# (ranking.md + per-candidate JSON) as a build artifact.
+#
+# Requires the repository secret ANTHROPIC_API_KEY (Settings → Secrets and
+# variables → Actions). Calls the Claude API, so it consumes API credits.
+
+on:
+  workflow_dispatch:
+    inputs:
+      role:
+        description: "Role to score (matches criteria/<role>.yaml)"
+        required: true
+        default: "software_engineer"
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Score and rank
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m src.cli rank "${{ github.event.inputs.role }}"
+
+      - name: Upload ranking
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ranking-${{ github.event.inputs.role }}
+          path: results/${{ github.event.inputs.role }}/
+          if-no-files-found: warn

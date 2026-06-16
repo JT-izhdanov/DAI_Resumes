@@ -105,6 +105,18 @@ under `roles/` — keep them identical.
 
 ---
 
+## Continuous integration
+
+Two GitHub Actions workflows are included:
+
+- **`CI`** (`.github/workflows/ci.yml`) — runs on every push and pull request.
+  Installs dependencies, compiles the sources, and validates that every
+  `criteria/<role>.yaml` is a well-formed rubric. Needs no API key.
+- **`Score résumés`** (`.github/workflows/score.yml`) — manually triggered
+  (`workflow_dispatch`). Pick a role; it scores that role's résumés and uploads
+  the ranking as a build artifact. Requires an `ANTHROPIC_API_KEY` repository
+  secret (Settings → Secrets and variables → Actions).
+
 ## Repository layout
 
 ```
