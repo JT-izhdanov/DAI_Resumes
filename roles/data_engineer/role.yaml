@@ -1,0 +1,14 @@
+# Data Engineer — mid-level. Uses the shared rubric as-is.
+role: data_engineer
+title: "Data Engineer"
+seniority: mid
+extends: data_engineer
+
+description: >
+  Owns well-scoped pipelines and data models independently and operates them
+  reliably in production.
+
+must_haves:
+  - "2+ years of professional data engineering experience."
+  - "Strong SQL plus at least one programming language (e.g. Python)."
+  - "Hands-on with a modern warehouse/lakehouse and an orchestration tool."

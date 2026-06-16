@@ -1,0 +1,14 @@
+# Data Architect — senior by default. Uses the shared rubric.
+role: data_architect
+title: "Data Architect"
+seniority: senior
+extends: data_architect
+
+description: >
+  Designs the enterprise data platform and sets standards for how data is
+  modeled, integrated, governed, and consumed.
+
+must_haves:
+  - "Experience designing production data platforms or architectures."
+  - "Hands-on data engineering/warehousing background before architecture."
+  - "7+ years in data roles, with architecture ownership."

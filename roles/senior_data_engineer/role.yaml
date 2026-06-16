@@ -1,0 +1,19 @@
+# Senior Data Engineer — extends the shared Data Engineer rubric.
+role: senior_data_engineer
+title: "Senior Data Engineer"
+seniority: senior
+extends: data_engineer
+
+description: >
+  Leads design of significant data systems, sets engineering standards, and
+  mentors other engineers.
+
+# Experience and design judgment matter more at this level.
+criteria:
+  - id: experience_relevance
+    weight: 4
+
+must_haves:
+  - "5+ years of professional data engineering experience."
+  - "Has led the design of production data pipelines or platforms."
+  - "Evidence of mentorship or technical leadership."

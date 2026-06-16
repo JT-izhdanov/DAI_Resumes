@@ -1,0 +1,68 @@
+# Shared rubric for the Data Engineer family.
+# Seniority roles (Associate/Senior/Principal) extend this and override only the
+# experience weight and must-haves.
+
+title: "Data Engineer"
+family: data_engineer
+
+scale:
+  0: "No evidence / disqualifying"
+  1: "Minimal — barely touches the criterion"
+  2: "Below expectations"
+  3: "Meets expectations"
+  4: "Exceeds expectations"
+  5: "Exceptional — clearly top-tier"
+
+criteria:
+  - id: pipeline_etl
+    name: "Data pipelines & ETL/ELT"
+    weight: 3
+    guidance: >
+      Building batch/streaming pipelines, ingestion, transformation, and
+      orchestration (Airflow, dbt, Dagster, Spark, Kafka).
+
+  - id: data_modeling_warehousing
+    name: "Data modeling & warehousing"
+    weight: 3
+    guidance: >
+      Dimensional/relational modeling and warehouse/lakehouse platforms
+      (Snowflake, BigQuery, Redshift, Databricks, Delta/Iceberg).
+
+  - id: programming
+    name: "Programming & SQL"
+    weight: 2
+    guidance: >
+      Proficiency in SQL plus Python/Scala/Java; code quality, testing, and
+      software-engineering practices.
+
+  - id: cloud_infra
+    name: "Cloud & infrastructure"
+    weight: 2
+    guidance: >
+      Cloud platforms (AWS/GCP/Azure), containerization, CI/CD, and
+      infrastructure-as-code for data workloads.
+
+  - id: reliability_quality
+    name: "Reliability & data quality"
+    guidance: >
+      Data quality, testing, observability, lineage, and operating pipelines
+      reliably at scale.
+    weight: 2
+
+  - id: collaboration
+    name: "Collaboration & communication"
+    weight: 1
+    guidance: >
+      Working with analysts/scientists and stakeholders; documentation, code
+      review, and clear communication.
+
+  - id: experience_relevance
+    name: "Relevant experience"
+    weight: 2
+    guidance: >
+      Years and relevance of professional data engineering experience,
+      calibrated to the target seniority.
+
+must_haves:
+  - "Demonstrated professional data engineering experience."
+  - "Strong SQL plus at least one programming language (e.g. Python)."

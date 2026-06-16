@@ -1,0 +1,14 @@
+# AI Engineer — mid/senior. Uses the shared rubric.
+role: ai_engineer
+title: "AI Engineer"
+seniority: senior
+extends: ai_engineer
+
+description: >
+  Builds and ships ML/AI systems — including LLM/GenAI applications — and is
+  responsible for getting them into production and keeping them healthy.
+
+must_haves:
+  - "Has built and deployed ML or AI systems beyond coursework."
+  - "Proficiency in Python and at least one ML framework (PyTorch/TensorFlow)."
+  - "4+ years of applied ML/AI engineering experience."

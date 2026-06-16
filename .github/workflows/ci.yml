@@ -1,0 +1,44 @@
+name: CI
+
+# Validates the pipeline on every push and pull request: dependencies install,
+# all source compiles, and every criteria/<role>.yaml is a valid rubric.
+# No API key required — this never calls the Claude API.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Compile all sources
+        run: python -m compileall -q src
+
+      - name: Validate every role rubric
+        run: |
+          python - <<'PY'
+          from src import criteria
+          roles = criteria.available_roles()
+          if not roles:
+              raise SystemExit("No rubrics found under roles/*/role.yaml")
+          for role in roles:
+              rubric = criteria.load_rubric(role)
+              weights = rubric.normalized_weights()
+              assert abs(sum(weights.values()) - 1.0) < 1e-9, role
+              print(f"OK  {role}: {len(rubric.criteria)} criteria, "
+                    f"{len(rubric.must_haves)} must-have(s)")
+          print(f"Validated {len(roles)} role rubric(s).")
+          PY

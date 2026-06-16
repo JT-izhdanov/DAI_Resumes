@@ -1,0 +1,59 @@
+# Shared rubric for the BI Developer family.
+
+title: "BI Developer"
+family: bi_developer
+
+scale:
+  0: "No evidence / disqualifying"
+  1: "Minimal — barely touches the criterion"
+  2: "Below expectations"
+  3: "Meets expectations"
+  4: "Exceeds expectations"
+  5: "Exceptional — clearly top-tier"
+
+criteria:
+  - id: bi_tooling
+    name: "BI platform expertise"
+    weight: 3
+    guidance: >
+      Depth in BI/visualization tools (Power BI, Tableau, Looker, Qlik):
+      data sources, models, DAX/LookML, performance tuning.
+
+  - id: sql_data_modeling
+    name: "SQL & semantic modeling"
+    weight: 3
+    guidance: >
+      Strong SQL and building semantic/metric layers and star schemas that
+      power reliable, reusable reporting.
+
+  - id: dashboard_design_viz
+    name: "Dashboard design & visualization"
+    weight: 2
+    guidance: >
+      Effective visual design, UX, storytelling with data, and self-service
+      enablement for business users.
+
+  - id: requirements_business
+    name: "Requirements & business acumen"
+    weight: 2
+    guidance: >
+      Translating business questions into metrics and KPIs; partnering with
+      stakeholders to define requirements.
+
+  - id: dataops
+    name: "BI engineering & DataOps"
+    weight: 1
+    guidance: >
+      Version control, deployment pipelines, testing, and governance of BI
+      content; ETL/data-prep upstream of reports.
+
+  - id: experience_relevance
+    name: "Relevant experience"
+    weight: 2
+    guidance: >
+      Years and relevance of BI/reporting experience, calibrated to the target
+      seniority.
+
+must_haves:
+  - "Hands-on experience building dashboards/reports in a major BI tool."
+  - "Strong SQL for querying and modeling reporting data."
