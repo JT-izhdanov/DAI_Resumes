@@ -1,0 +1,19 @@
+# Principal Data Engineer — extends the shared Data Engineer rubric.
+role: principal_data_engineer
+title: "Principal Data Engineer"
+seniority: principal
+extends: data_engineer
+
+description: >
+  Sets technical direction for data engineering across the org, owns the
+  hardest architecture decisions, and multiplies the team's impact.
+
+# Heaviest weight on experience and breadth at the principal level.
+criteria:
+  - id: experience_relevance
+    weight: 5
+
+must_haves:
+  - "10+ years of data engineering experience with org-wide impact."
+  - "Has owned architecture/technical direction for major data platforms."
+  - "Track record of mentoring senior engineers and setting standards."

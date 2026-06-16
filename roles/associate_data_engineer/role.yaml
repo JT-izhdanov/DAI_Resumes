@@ -1,0 +1,18 @@
+# Associate Data Engineer — extends the shared Data Engineer rubric.
+role: associate_data_engineer
+title: "Associate Data Engineer"
+seniority: associate
+extends: data_engineer
+
+description: >
+  Entry-level data engineer. Strong fundamentals and trajectory matter more
+  than years of experience.
+
+# Lower the weight on experience at this level; everything else inherited.
+criteria:
+  - id: experience_relevance
+    weight: 1
+
+must_haves:
+  - "Foundational data/SQL skills via internships, projects, or coursework."
+  - "Proficiency in SQL and a programming language such as Python."

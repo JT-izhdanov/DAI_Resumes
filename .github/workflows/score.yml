@@ -1,8 +1,8 @@
-name: Score résumés
+name: Assess résumés
 
-# Manually-triggered scoring run. Pick a role; this scores every résumé in
-# roles/<role>/resumes/ against criteria/<role>.yaml and uploads the ranking
-# (ranking.md + per-candidate JSON) as a build artifact.
+# Manually-triggered assessment run. Scores a résumé pool against a role's
+# criteria and uploads the ranking (ranking.md + per-candidate JSON) as an
+# artifact.
 #
 # Requires the repository secret ANTHROPIC_API_KEY (Settings → Secrets and
 # variables → Actions). Calls the Claude API, so it consumes API credits.
@@ -11,12 +11,20 @@ on:
   workflow_dispatch:
     inputs:
       role:
-        description: "Role to score (matches criteria/<role>.yaml)"
+        description: "Role whose criteria to score against (see roles/)."
         required: true
-        default: "software_engineer"
+        default: "data_engineer"
+      pool:
+        description: "Résumé pool: a role name or path. Blank = the role's own pool."
+        required: false
+        default: ""
+      label:
+        description: "Results subfolder name (optional)."
+        required: false
+        default: ""
 
 jobs:
-  score:
+  assess:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,10 +38,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Score and rank
+      - name: Assess and rank
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python -m src.cli rank "${{ github.event.inputs.role }}"
+          ROLE: ${{ github.event.inputs.role }}
+          POOL: ${{ github.event.inputs.pool }}
+          LABEL: ${{ github.event.inputs.label }}
+        run: |
+          args=(assess "$ROLE")
+          [ -n "$POOL" ] && args+=(--pool "$POOL")
+          [ -n "$LABEL" ] && args+=(--label "$LABEL")
+          python -m src.cli "${args[@]}"
 
       - name: Upload ranking
         if: always()

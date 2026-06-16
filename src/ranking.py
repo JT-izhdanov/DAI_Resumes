@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import List
 
@@ -19,9 +18,9 @@ def rank(scored: List[ScoredResume]) -> List[ScoredResume]:
     )
 
 
-def write_results(role: str, ranked: List[ScoredResume]) -> Path:
+def write_results(role: str, label: str, ranked: List[ScoredResume]) -> Path:
     """Write per-candidate JSON and a ranking.md; return the results folder."""
-    out_dir = config.role_results_dir(role)
+    out_dir = config.role_results_dir(role, label)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for s in ranked:
@@ -31,36 +30,44 @@ def write_results(role: str, ranked: List[ScoredResume]) -> Path:
         )
 
     ranking_path = out_dir / "ranking.md"
-    ranking_path.write_text(_render_markdown(role, ranked), encoding="utf-8")
+    ranking_path.write_text(_render_markdown(role, label, ranked), encoding="utf-8")
     return out_dir
 
 
-def _render_markdown(role: str, ranked: List[ScoredResume]) -> str:
-    lines = [f"# Candidate ranking — {role}", ""]
+def _render_markdown(role: str, label: str, ranked: List[ScoredResume]) -> str:
+    lines = [f"# Candidate ranking — {role}", "", f"_Résumé pool: {label}_", ""]
     if not ranked:
         lines.append("_No résumés scored._")
         return "\n".join(lines) + "\n"
 
-    lines += [
-        "| Rank | Candidate | Score | Must-haves | File |",
-        "| ---- | --------- | ----- | ---------- | ---- |",
-    ]
+    # Show the Source column only when résumés come from more than one pool.
+    multi_source = len({s.source_pool for s in ranked}) > 1
+    header = "| Rank | Candidate | Score | Must-haves |"
+    sep = "| ---- | --------- | ----- | ---------- |"
+    if multi_source:
+        header += " Source |"
+        sep += " ------ |"
+    header += " File |"
+    sep += " ---- |"
+    lines += [header, sep]
+
     for i, s in enumerate(ranked, start=1):
         gate = "✅" if s.passes_must_haves else "⚠️ fails"
-        name = s.assessment.candidate_name
-        lines.append(
-            f"| {i} | {name} | {s.weighted_score:.2f} / 5 | {gate} | `{s.source_file}` |"
-        )
+        row = f"| {i} | {s.assessment.candidate_name} | {s.weighted_score:.2f} / 5 | {gate} |"
+        if multi_source:
+            row += f" {s.source_pool} |"
+        row += f" `{s.source_file}` |"
+        lines.append(row)
 
-    lines.append("")
-    lines.append("---")
+    lines += ["", "---"]
     for i, s in enumerate(ranked, start=1):
         a = s.assessment
+        provenance = f" · submitted for `{s.source_pool}`" if multi_source else ""
         lines += [
             "",
             f"## {i}. {a.candidate_name} — {s.weighted_score:.2f} / 5",
             "",
-            f"_{s.source_file}_",
+            f"_{s.source_file}{provenance}_",
             "",
             a.summary,
             "",

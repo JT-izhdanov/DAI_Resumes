@@ -1,0 +1,14 @@
+# BI Developer — mid-level. Uses the shared rubric.
+role: bi_developer
+title: "BI Developer"
+seniority: mid
+extends: bi_developer
+
+description: >
+  Builds and maintains dashboards, reports, and semantic models that give the
+  business reliable, self-service analytics.
+
+must_haves:
+  - "Hands-on experience building dashboards/reports in a major BI tool."
+  - "Strong SQL for querying and modeling reporting data."
+  - "2+ years in a BI/reporting/analytics-engineering role."

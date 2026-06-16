@@ -1,0 +1,66 @@
+# Shared rubric for the AI Engineer family.
+
+title: "AI Engineer"
+family: ai_engineer
+
+scale:
+  0: "No evidence / disqualifying"
+  1: "Minimal — barely touches the criterion"
+  2: "Below expectations"
+  3: "Meets expectations"
+  4: "Exceeds expectations"
+  5: "Exceptional — clearly top-tier"
+
+criteria:
+  - id: ml_foundations
+    name: "ML/DL foundations"
+    weight: 3
+    guidance: >
+      Solid grounding in machine learning and deep learning: modeling, training,
+      evaluation, and knowing when (not) to use which approach.
+
+  - id: ml_engineering_mlops
+    name: "ML engineering & MLOps"
+    weight: 3
+    guidance: >
+      Productionizing models: serving, pipelines, monitoring, evaluation,
+      experiment tracking, and CI/CD for ML.
+
+  - id: programming_frameworks
+    name: "Programming & frameworks"
+    weight: 2
+    guidance: >
+      Python plus ML frameworks (PyTorch, TensorFlow, scikit-learn) and solid
+      software-engineering practices.
+
+  - id: llm_genai
+    name: "LLMs & generative AI"
+    weight: 2
+    guidance: >
+      Working with LLMs and GenAI: prompting, RAG, agents, fine-tuning,
+      evaluation, and the trade-offs involved.
+
+  - id: data_handling
+    name: "Data handling for ML"
+    weight: 1
+    guidance: >
+      Feature engineering, data pipelines, and dataset/quality management
+      feeding models.
+
+  - id: impact
+    name: "Demonstrated impact"
+    weight: 2
+    guidance: >
+      Concrete, quantified outcomes from shipped AI/ML systems (accuracy,
+      latency, cost, revenue, adoption).
+
+  - id: experience_relevance
+    name: "Relevant experience"
+    weight: 2
+    guidance: >
+      Years and relevance of applied ML/AI engineering experience, calibrated
+      to the target seniority.
+
+must_haves:
+  - "Has built and deployed ML or AI systems beyond coursework."
+  - "Proficiency in Python and at least one ML framework."

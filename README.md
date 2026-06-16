@@ -1,107 +1,165 @@
 # DAI Resumes
 
-A repository for storing résumés organized **by role**, with an AI pipeline that
-scores each résumé against role-specific criteria and ranks the top candidates.
+A repository for a **Data & AI hiring team** to store résumés **by role**, define
+a ranking rubric per role, and run AI-driven assessments to surface top
+candidates. Built around three ideas:
 
-It uses the [Claude API](https://platform.claude.com) (model `claude-opus-4-8`)
-to evaluate each résumé against a structured rubric and produce an explainable,
-per-criterion score.
+1. **Résumés are stored by role** — drop files into `roles/<role>/resumes/`.
+2. **Criteria are defined per role** — a rubric in `roles/<role>/role.yaml`, with
+   an optional job description. You can also auto-draft a rubric from a JD.
+3. **Pools and criteria are decoupled** — you can assess *any* résumé pool against
+   *any* role's criteria. That makes the seniority ladder (Associate → Principal
+   Data Engineer) and overlap between roles easy to handle: score the Data
+   Engineer applicant pool against the Senior Data Engineer rubric in one command.
+
+Scoring uses the [Claude API](https://platform.claude.com) (model
+`claude-opus-4-8`) with structured outputs, so every candidate gets an
+explainable, per-criterion breakdown.
 
 ---
 
 ## How it works
 
 ```
-roles/<role>/resumes/*.pdf|*.docx        ← drop résumés here
+roles/<role>/role.yaml          ← criteria (may `extends:` a family template)
+roles/<role>/job_description.md  ← optional JD, fed to the scorer
+roles/<role>/resumes/*.pdf|docx  ← the pool submitted for this role
         │
         ▼
-  parse text (pdfplumber / python-docx)
+  assess  <role>  --pool <any role or path>     ← criteria ✕ pool, decoupled
         │
-        ▼
-  score against criteria/<role>.yaml      ← Claude API, structured output
-        │
-        ▼
-  rank candidates  ───►  results/<role>/*.json + ranking.md
+        ▼  Claude API, structured per-criterion scoring
+  results/<role>/<label>/ranking.md + *.json
 ```
 
-Each role has:
+---
 
-- **A criteria file** — `criteria/<role>.yaml` defines the rubric: weighted
-  criteria, must-haves, and the scoring scale.
-- **A résumé folder** — `roles/<role>/resumes/` holds the candidate files
-  (PDF and DOCX supported).
+## Seeded roles
 
-The scorer reads the rubric, evaluates every résumé in the role folder, and
-writes a ranked shortlist to `results/<role>/`.
+The repo ships with rubrics for the team's hiring families. Run
+`python -m src.cli list-roles` to see them:
+
+| Family | Roles | Template |
+| ------ | ----- | -------- |
+| Data Engineer | `associate_data_engineer`, `data_engineer`, `senior_data_engineer`, `principal_data_engineer` | `templates/data_engineer.yaml` |
+| Data Architect | `data_architect` | `templates/data_architect.yaml` |
+| BI Developer | `bi_developer` | `templates/bi_developer.yaml` |
+| AI Engineer | `ai_engineer` | `templates/ai_engineer.yaml` |
+
+The four Data Engineer roles **share one rubric** (the template) and only
+override the experience weight and must-haves per level — so the difference
+between Associate and Principal is purely the seniority bar, not a rewritten
+rubric.
 
 ---
 
 ## Quick start
 
-### 1. Install
-
 ```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+cp .env.example .env                                # set ANTHROPIC_API_KEY
 ```
-
-### 2. Set your API key
 
 ```bash
-cp .env.example .env
-# edit .env and set ANTHROPIC_API_KEY=sk-ant-...
+# 1. Drop résumés into a role's pool
+#    roles/data_engineer/resumes/jane_doe.pdf
+#    roles/data_engineer/resumes/john_smith.docx
+
+# 2. Assess them against that role and rank
+python -m src.cli rank data_engineer
+
+# 3. Read the shortlist
+#    results/data_engineer/applicants/ranking.md
 ```
-
-You can get a key from the [Claude Console](https://platform.claude.com).
-
-### 3. Add résumés
-
-Drop candidate files into the role folder you care about, e.g.:
-
-```
-roles/software_engineer/resumes/jane_doe.pdf
-roles/software_engineer/resumes/john_smith.docx
-```
-
-A sample role (`software_engineer`) and rubric ship with the repo so you can try
-the pipeline immediately.
-
-### 4. Score and rank
-
-```bash
-# Score every résumé for a role and print the ranking
-python -m src.cli rank software_engineer
-
-# List the roles available
-python -m src.cli list-roles
-
-# Score a single file without committing it to a role folder
-python -m src.cli score-file software_engineer path/to/resume.pdf
-```
-
-Results land in `results/software_engineer/`:
-
-- `ranking.md` — human-readable shortlist, best candidate first.
-- `<candidate>.json` — full per-criterion breakdown for each résumé.
 
 ---
 
-## Adding a new role
+## Commands
 
-1. Create the résumé folder:
+```bash
+# Discover what's configured
+python -m src.cli list-roles
+python -m src.cli list-templates
 
-   ```bash
-   mkdir -p roles/data_analyst/resumes
-   ```
+# Assess a role against its own applicant pool
+python -m src.cli rank <role>
 
-2. Create the rubric `criteria/data_analyst.yaml` (copy
-   `criteria/software_engineer.yaml` as a starting point).
+# Assess any pool(s) against a role's criteria (the cross-pool feature)
+python -m src.cli assess <role> --pool <role-or-path> [--pool ...] [--label NAME]
 
-3. Drop résumés in and run `python -m src.cli rank data_analyst`.
+# Score a single file ad hoc
+python -m src.cli score-file <role> path/to/resume.pdf
 
-The role name is just the filename stem of the criteria file and the folder name
-under `roles/` — keep them identical.
+# Draft a role's rubric from a job description (uses Claude)
+python -m src.cli draft-criteria <role> --jd path/to/jd.txt \
+    [--family data_engineer] [--seniority senior] [--extends data_engineer]
+```
+
+### Cross-pool assessment (the scalability piece)
+
+A résumé submitted for one posting is often relevant to another — the same
+person may fit Data Engineer *and* Senior Data Engineer. You don't have to
+re-collect résumés. Point a role's criteria at another pool:
+
+```bash
+# Score everyone who applied for Data Engineer against the SENIOR rubric
+python -m src.cli assess senior_data_engineer --pool data_engineer
+
+# Combine multiple pools into one ranking for a newly posted role
+python -m src.cli assess principal_data_engineer \
+    --pool senior_data_engineer --pool data_engineer --label talent_pool
+
+# A pool can also be any folder or glob
+python -m src.cli assess ai_engineer --pool ./inbox/2026-q3/
+```
+
+Results go to `results/<role>/<label>/`. When a run draws from more than one
+pool, `ranking.md` adds a **Source** column so you can see which posting each
+candidate originally applied to.
+
+---
+
+## Defining and tuning criteria
+
+A role file is small when it extends a family template — it sets the seniority
+and overrides only what differs:
+
+```yaml
+# roles/senior_data_engineer/role.yaml
+role: senior_data_engineer
+title: "Senior Data Engineer"
+seniority: senior          # associate | mid | senior | principal
+extends: data_engineer     # template in templates/
+
+criteria:
+  - id: experience_relevance
+    weight: 4              # heavier than mid-level; other criteria inherited
+
+must_haves:
+  - "5+ years of professional data engineering experience."
+  - "Has led the design of production data pipelines or platforms."
+```
+
+The template (`templates/data_engineer.yaml`) defines the full criteria list,
+the 0–5 scale, and the default must-haves. Weights are relative and normalized
+automatically. `seniority` is passed to the model so scores are calibrated to
+the level.
+
+### Starting from a job description
+
+Drop in a JD and let Claude propose a starter rubric:
+
+```bash
+python -m src.cli draft-criteria staff_data_engineer \
+    --jd ./jds/staff_de.txt --family data_engineer --seniority principal
+```
+
+This writes `roles/staff_data_engineer/role.yaml` (and a copy of the JD). Review
+and tune the weights, then add résumés and `assess`.
+
+If you'd rather hand-write a role, copy an existing `roles/*/role.yaml` or extend
+a template.
 
 ---
 
@@ -109,30 +167,38 @@ under `roles/` — keep them identical.
 
 Two GitHub Actions workflows are included:
 
-- **`CI`** (`.github/workflows/ci.yml`) — runs on every push and pull request.
-  Installs dependencies, compiles the sources, and validates that every
-  `criteria/<role>.yaml` is a well-formed rubric. Needs no API key.
-- **`Score résumés`** (`.github/workflows/score.yml`) — manually triggered
-  (`workflow_dispatch`). Pick a role; it scores that role's résumés and uploads
-  the ranking as a build artifact. Requires an `ANTHROPIC_API_KEY` repository
-  secret (Settings → Secrets and variables → Actions).
+- **`CI`** (`.github/workflows/ci.yml`) — on every push/PR: installs deps,
+  compiles the sources, and validates that every role rubric resolves (template
+  `extends`, weights normalize, criteria well-formed). No API key needed.
+- **`Assess résumés`** (`.github/workflows/score.yml`) — manually triggered
+  (`workflow_dispatch`). Choose a role, an optional pool, and a label; it runs
+  the assessment and uploads the ranking as an artifact. Requires an
+  `ANTHROPIC_API_KEY` repository secret.
+
+---
 
 ## Repository layout
 
 ```
 DAI_Resumes/
-├── criteria/                 # one <role>.yaml rubric per role
-│   └── software_engineer.yaml
-├── roles/                    # résumés stored by role
-│   └── software_engineer/
-│       └── resumes/          # drop .pdf / .docx here
-├── results/                  # generated scores + rankings (git-ignored)
-├── src/                      # the scoring pipeline
+├── templates/                # reusable family rubrics (extend these)
+│   ├── data_engineer.yaml
+│   ├── data_architect.yaml
+│   ├── bi_developer.yaml
+│   └── ai_engineer.yaml
+├── roles/                    # one folder per role
+│   └── <role>/
+│       ├── role.yaml         # criteria (may `extends:` a template)
+│       ├── job_description.md # optional
+│       └── resumes/          # the pool submitted for this role
+├── results/                  # generated rankings + scores (git-ignored)
+├── src/
 │   ├── config.py             # paths + settings
-│   ├── criteria.py           # load/validate rubric YAML
-│   ├── parsing.py            # PDF/DOCX → text
-│   ├── scorer.py             # Claude API scoring
+│   ├── criteria.py           # rubric loading + template resolution
+│   ├── parsing.py            # PDF/DOCX → text; résumé-pool resolution
+│   ├── scorer.py             # Claude API scoring (seniority + JD aware)
 │   ├── ranking.py            # aggregate + rank + render
+│   ├── generate.py           # draft a rubric from a job description
 │   └── cli.py                # command-line entry point
 ├── requirements.txt
 └── .env.example
@@ -144,5 +210,5 @@ DAI_Resumes/
 
 Résumés contain personal data. Scoring sends résumé text to the Claude API.
 Review your data-handling obligations (GDPR/CCPA, candidate consent) before
-uploading real candidate data, and avoid committing real résumés to a public
-repository.
+uploading real candidate data, and don't commit real résumés to a public repo —
+`.gitignore` already excludes `roles/**/resumes/*.pdf|docx`.

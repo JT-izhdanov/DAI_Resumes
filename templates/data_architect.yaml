@@ -1,0 +1,60 @@
+# Shared rubric for the Data Architect family.
+
+title: "Data Architect"
+family: data_architect
+
+scale:
+  0: "No evidence / disqualifying"
+  1: "Minimal — barely touches the criterion"
+  2: "Below expectations"
+  3: "Meets expectations"
+  4: "Exceeds expectations"
+  5: "Exceptional — clearly top-tier"
+
+criteria:
+  - id: architecture_design
+    name: "Data architecture & platform design"
+    weight: 3
+    guidance: >
+      Designing end-to-end data platforms: lakehouse/warehouse architecture,
+      integration patterns, streaming vs batch, and technology selection with
+      clear trade-off reasoning.
+
+  - id: data_modeling
+    name: "Enterprise data modeling"
+    weight: 3
+    guidance: >
+      Conceptual/logical/physical modeling, canonical models, master data, and
+      domain-driven / data-mesh approaches.
+
+  - id: governance_security
+    name: "Governance, security & compliance"
+    weight: 2
+    guidance: >
+      Data governance, cataloging, lineage, access control, privacy, and
+      regulatory compliance (GDPR/CCPA/HIPAA as relevant).
+
+  - id: platform_breadth
+    name: "Technology breadth"
+    weight: 2
+    guidance: >
+      Breadth across cloud data platforms, integration/ETL tooling, BI layers,
+      and ML/AI enablement.
+
+  - id: stakeholder_leadership
+    name: "Stakeholder & technical leadership"
+    weight: 2
+    guidance: >
+      Setting standards, guiding engineering teams, and aligning architecture
+      with business strategy across stakeholders.
+
+  - id: experience_relevance
+    name: "Relevant experience"
+    weight: 2
+    guidance: >
+      Depth and relevance of architecture experience on production data
+      platforms, calibrated to the target seniority.
+
+must_haves:
+  - "Experience designing production data platforms or architectures."
+  - "Hands-on background in data engineering or warehousing before architecture."

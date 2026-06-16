@@ -33,7 +33,7 @@ jobs:
           from src import criteria
           roles = criteria.available_roles()
           if not roles:
-              raise SystemExit("No rubrics found under criteria/*.yaml")
+              raise SystemExit("No rubrics found under roles/*/role.yaml")
           for role in roles:
               rubric = criteria.load_rubric(role)
               weights = rubric.normalized_weights()

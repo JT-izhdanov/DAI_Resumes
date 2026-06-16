@@ -2,13 +2,17 @@
 
 Uses structured outputs (`client.messages.parse`) so the model returns a
 validated, per-criterion breakdown rather than free text. The weighted total is
-computed in code from the model's per-criterion scores — the math is ours, the
-judgment is the model's.
+computed in code from the model's per-criterion scores — the judgment is the
+model's, the math is ours.
+
+The system prompt is assembled from the rubric, the target seniority, and the
+role's job description (when present), so the same résumé can be assessed
+against different roles and levels.
 """
 
 from __future__ import annotations
 
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 import anthropic
 from pydantic import BaseModel, Field
@@ -17,7 +21,7 @@ from . import config
 from .criteria import Rubric
 
 # Reusable client. Reads ANTHROPIC_API_KEY from the environment.
-_client: anthropic.Anthropic | None = None
+_client: Optional[anthropic.Anthropic] = None
 
 
 def _get_client() -> anthropic.Anthropic:
@@ -27,12 +31,32 @@ def _get_client() -> anthropic.Anthropic:
     return _client
 
 
+# Per-level calibration guidance injected into the prompt.
+_SENIORITY_GUIDANCE = {
+    "associate": (
+        "This is an Associate / entry-level role (typically 0–2 years). Reward "
+        "strong fundamentals, trajectory, and potential; do not penalize limited "
+        "professional experience."
+    ),
+    "mid": (
+        "This is a mid-level role (typically 2–5 years) where the candidate owns "
+        "well-scoped work independently."
+    ),
+    "senior": (
+        "This is a Senior role (typically 5–8+ years) expecting ownership of "
+        "significant systems, technical leadership, and mentorship."
+    ),
+    "principal": (
+        "This is a Principal role (typically 10+ years) expecting org-wide "
+        "technical leadership, architecture ownership, and strategic impact."
+    ),
+}
+
+
 # ---- Structured output schema -------------------------------------------------
 
 
 class CriterionScore(BaseModel):
-    """The model's assessment of one criterion."""
-
     criterion_id: str = Field(description="Matches an `id` from the rubric criteria.")
     score: int = Field(ge=0, le=5, description="0–5 score on the rubric scale.")
     justification: str = Field(
@@ -41,16 +65,12 @@ class CriterionScore(BaseModel):
 
 
 class MustHaveCheck(BaseModel):
-    """Pass/fail/unknown verdict on a hard-gate requirement."""
-
     requirement: str
     verdict: Literal["pass", "fail", "unknown"]
     note: str = Field(description="Brief reason for the verdict.")
 
 
 class ResumeAssessment(BaseModel):
-    """The full structured assessment the model returns for one résumé."""
-
     candidate_name: str = Field(
         description="Candidate's name as it appears on the résumé, or 'Unknown'."
     )
@@ -61,14 +81,13 @@ class ResumeAssessment(BaseModel):
     concerns: List[str] = Field(description="Gaps, risks, or missing information.")
 
 
-# ---- Scored result (assessment + computed weighted total) --------------------
-
-
 class ScoredResume(BaseModel):
     """An assessment plus the weighted total computed in code."""
 
     source_file: str
+    source_pool: str = Field(description="Pool the résumé came from (provenance).")
     role: str
+    seniority: Optional[str] = None
     weighted_score: float = Field(description="0–5 weighted total.")
     passes_must_haves: bool
     assessment: ResumeAssessment
@@ -85,21 +104,42 @@ def _build_system_prompt(rubric: Rubric) -> str:
         if rubric.must_haves
         else "  (none)"
     )
-    return (
-        f"You are an expert technical recruiter screening candidates for the "
-        f"role of {rubric.title}.\n\n"
-        f"Role description:\n{rubric.description.strip()}\n\n"
-        f"Score each criterion on this 0–5 scale:\n{scale_lines}\n\n"
-        f"Criteria to score (return one entry per id, using the exact id):\n"
-        f"{criteria_lines}\n\n"
-        f"Hard-gate requirements (judge pass/fail/unknown):\n{must_have_lines}\n\n"
-        "Be evidence-based and calibrated. Only credit what the résumé actually "
-        "shows; use 'unknown' for must-haves when the résumé is silent rather than "
-        "assuming pass or fail. Do not invent experience that isn't stated."
+
+    parts = [
+        f"You are an expert technical recruiter for a Data & AI team, screening "
+        f"candidates for the role of {rubric.title}."
+    ]
+    if rubric.seniority and rubric.seniority in _SENIORITY_GUIDANCE:
+        parts.append(_SENIORITY_GUIDANCE[rubric.seniority])
+    if rubric.description.strip():
+        parts.append(f"Role description:\n{rubric.description.strip()}")
+    if rubric.jd_text:
+        parts.append(
+            "Full job description (authoritative — prefer it where it conflicts "
+            f"with the summary):\n{rubric.jd_text}"
+        )
+    parts.append(f"Score each criterion on this 0–5 scale:\n{scale_lines}")
+    parts.append(
+        "Criteria to score (return one entry per id, using the exact id):\n"
+        f"{criteria_lines}"
     )
+    parts.append(f"Hard-gate requirements (judge pass/fail/unknown):\n{must_have_lines}")
+    parts.append(
+        "Be evidence-based and calibrated to the target seniority. Credit only "
+        "what the résumé actually shows; use 'unknown' for must-haves when the "
+        "résumé is silent rather than assuming pass or fail. Do not invent "
+        "experience that isn't stated. Note that a résumé may have been submitted "
+        "for a different role — assess it purely against the criteria above."
+    )
+    return "\n\n".join(parts)
 
 
-def score_resume(role: str, source_file: str, resume_text: str, rubric: Rubric) -> ScoredResume:
+def score_resume(
+    rubric: Rubric,
+    source_file: str,
+    resume_text: str,
+    source_pool: str,
+) -> ScoredResume:
     """Score a single résumé's text against the rubric."""
     if not resume_text.strip():
         raise ValueError(f"No text extracted from {source_file}; cannot score.")
@@ -137,7 +177,9 @@ def score_resume(role: str, source_file: str, resume_text: str, rubric: Rubric) 
 
     return ScoredResume(
         source_file=source_file,
-        role=role,
+        source_pool=source_pool,
+        role=rubric.role,
+        seniority=rubric.seniority,
         weighted_score=round(weighted, 3),
         passes_must_haves=passes,
         assessment=assessment,
@@ -145,11 +187,9 @@ def score_resume(role: str, source_file: str, resume_text: str, rubric: Rubric) 
 
 
 def _weighted_total(assessment: ResumeAssessment, rubric: Rubric) -> float:
-    """Combine per-criterion scores using the rubric's normalized weights."""
     weights = rubric.normalized_weights()
     by_id = {cs.criterion_id: cs.score for cs in assessment.criterion_scores}
     total = 0.0
     for criterion_id, weight in weights.items():
-        # Missing criterion → treated as 0, surfacing incomplete assessments.
-        total += weight * by_id.get(criterion_id, 0)
+        total += weight * by_id.get(criterion_id, 0)  # missing → 0, surfaces gaps
     return total
