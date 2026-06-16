@@ -1,4 +1,9 @@
-"""Aggregate scored résumés into a ranking and render the output."""
+"""Aggregate scored résumés into a ranking and render the output.
+
+Results are written incrementally — one JSON per candidate as it's scored — so a
+large batch is resumable and a crash never loses completed work. The ranking is
+rebuilt from whatever JSON files are present.
+"""
 
 from __future__ import annotations
 
@@ -18,20 +23,43 @@ def rank(scored: List[ScoredResume]) -> List[ScoredResume]:
     )
 
 
-def write_results(role: str, label: str, ranked: List[ScoredResume]) -> Path:
-    """Write per-candidate JSON and a ranking.md; return the results folder."""
+def result_path(role: str, label: str, source_file: str) -> Path:
+    """Per-candidate JSON path for a résumé."""
+    return config.role_results_dir(role, label) / f"{Path(source_file).stem}.json"
+
+
+def write_one(role: str, label: str, scored: ScoredResume) -> Path:
+    """Persist a single candidate's assessment immediately (idempotent)."""
+    path = result_path(role, label, scored.source_file)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(scored.model_dump_json(indent=2), encoding="utf-8")
+    return path
+
+
+def is_scored(role: str, label: str, source_file: str) -> bool:
+    """Whether this résumé already has a result on disk (for resumability)."""
+    return result_path(role, label, source_file).exists()
+
+
+def load_results(role: str, label: str) -> List[ScoredResume]:
+    """Load every per-candidate JSON in a results folder."""
+    out_dir = config.role_results_dir(role, label)
+    if not out_dir.exists():
+        return []
+    scored: List[ScoredResume] = []
+    for p in sorted(out_dir.glob("*.json")):
+        scored.append(ScoredResume.model_validate_json(p.read_text(encoding="utf-8")))
+    return scored
+
+
+def rebuild(role: str, label: str) -> Path:
+    """Re-render ranking.md from all per-candidate JSON on disk."""
+    ranked = rank(load_results(role, label))
     out_dir = config.role_results_dir(role, label)
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    for s in ranked:
-        stem = Path(s.source_file).stem
-        (out_dir / f"{stem}.json").write_text(
-            s.model_dump_json(indent=2), encoding="utf-8"
-        )
-
     ranking_path = out_dir / "ranking.md"
     ranking_path.write_text(_render_markdown(role, label, ranked), encoding="utf-8")
-    return out_dir
+    return ranking_path
 
 
 def _render_markdown(role: str, label: str, ranked: List[ScoredResume]) -> str:

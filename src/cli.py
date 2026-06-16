@@ -16,10 +16,17 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
+import os
+
+from . import batch
 from . import criteria as criteria_mod
 from . import parsing, ranking
 from .parsing import ResumeRef
 from .scorer import ScoredResume, score_resume
+
+
+def _has_api_key() -> bool:
+    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
 
 
 def _cmd_list_roles(_args: argparse.Namespace) -> int:
@@ -61,40 +68,91 @@ def _score_one(rubric, ref: ResumeRef) -> Optional[ScoredResume]:
 def _default_label(role: str, pools: List[str]) -> str:
     if pools == [role]:
         return "applicants"
-    others = [p for p in pools]
-    return "from-" + "+".join(others) if others else "applicants"
+    return "from-" + "+".join(pools) if pools else "applicants"
 
 
-def _run_assessment(role: str, pools: List[str], label: str) -> int:
+def _print_preflight(pre: batch.Preflight, pools: List[str]) -> None:
+    print(f"Preflight — assess '{pre.role}' [pool: {pre.label}]")
+    print(f"  pools:           {', '.join(pools)}")
+    print(f"  parseable:       {pre.parseable} résumé(s)")
+    if pre.already_scored:
+        print(f"  already scored:  {pre.already_scored} (skipped; use --force to redo)")
+    print(f"  to score:        {pre.to_score}")
+    if pre.unsupported:
+        print(f"  unsupported:     {len(pre.unsupported)} file(s) will be skipped:")
+        for p in pre.unsupported[:10]:
+            print(f"                     - {p.name}")
+        if len(pre.unsupported) > 10:
+            print(f"                     ... and {len(pre.unsupported) - 10} more")
+    if pre.to_score:
+        lo, hi = pre.cost_band()
+        print(f"  est. API cost:   ~${lo:.2f}–${hi:.2f} (rough; default model)")
+
+
+def _run_assessment(
+    role: str, pools: List[str], label: str, *,
+    concurrency: int, force: bool, dry_run: bool, limit: Optional[int],
+) -> int:
     rubric = criteria_mod.load_rubric(role)
-    refs = parsing.gather(pools)
-    if not refs:
+    pre, todo = batch.plan(role, label, pools, force)
+
+    if pre.parseable == 0 and not pre.unsupported:
         print(
             f"No résumés found in pool(s): {', '.join(pools)}.\n"
             f"Add .pdf/.docx files (e.g. into roles/{pools[0]}/resumes/) and re-run."
         )
         return 1
 
+    if limit is not None:
+        todo = todo[:limit]
+        pre.to_score = len(todo)
+
+    _print_preflight(pre, pools)
+
+    if dry_run:
+        print("\n(--dry-run: no résumés scored.)")
+        return 0
+    if not todo:
+        print("\nNothing to score — all résumés already have results.")
+        ranking.rebuild(role, label)
+        return 0
+    if not _has_api_key():
+        print(
+            "\nERROR: no ANTHROPIC_API_KEY (or ANTHROPIC_AUTH_TOKEN) in the "
+            "environment. Set it (see .env.example) before scoring.",
+            file=sys.stderr,
+        )
+        return 2
+
     target = rubric.title + (f" ({rubric.seniority})" if rubric.seniority else "")
-    print(
-        f"Assessing {len(refs)} résumé(s) against '{target}' "
-        f"[pool: {label}] with the Claude API..."
-    )
-    scored = [s for ref in refs if (s := _score_one(rubric, ref))]
-    if not scored:
-        print("No résumés were successfully scored.", file=sys.stderr)
-        return 1
+    print(f"\nScoring {len(todo)} résumé(s) against '{target}' "
+          f"with concurrency {concurrency}...")
 
-    ranked = ranking.rank(scored)
-    out_dir = ranking.write_results(role, label, ranked)
+    def _progress(done, total, ref, err):
+        status = "ok " if err is None else "ERR"
+        print(f"  [{done}/{total}] {status} {ref.path.name} (from {ref.source})", flush=True)
 
-    print(f"\nTop candidates for '{role}' [{label}]:")
+    result = batch.run(rubric, role, label, todo, concurrency=concurrency, progress=_progress)
+
+    ranked = ranking.rank(ranking.load_results(role, label))
+    print(f"\nScored {result.scored}, failed {result.failed}, "
+          f"ranked {len(ranked)} total for '{role}' [{label}].")
+    if result.errors:
+        print("Failures:")
+        for name, msg in result.errors[:10]:
+            print(f"  - {name}: {msg}")
+        if len(result.errors) > 10:
+            print(f"  ... and {len(result.errors) - 10} more")
+
+    print("\nTop candidates:")
     multi = len({s.source_pool for s in ranked}) > 1
-    for i, s in enumerate(ranked, start=1):
+    for i, s in enumerate(ranked[:10], start=1):
         gate = "" if s.passes_must_haves else "  [fails must-haves]"
         src = f"  ({s.source_pool})" if multi else ""
         print(f"  {i}. {s.assessment.candidate_name:<28} {s.weighted_score:.2f}/5{src}{gate}")
-    print(f"\nFull results written to {out_dir}/ (ranking.md + per-candidate JSON).")
+    if len(ranked) > 10:
+        print(f"  ... {len(ranked) - 10} more in the full ranking.")
+    print(f"\nFull results: {result.ranking_path} (+ per-candidate JSON).")
     return 0
 
 
@@ -105,12 +163,18 @@ def _cmd_assess(args: argparse.Namespace) -> int:
         return 1
     pools = args.pool or [role]
     label = args.label or _default_label(role, pools)
-    return _run_assessment(role, pools, label)
+    return _run_assessment(
+        role, pools, label, concurrency=args.concurrency, force=args.force,
+        dry_run=args.dry_run, limit=args.limit,
+    )
 
 
 def _cmd_rank(args: argparse.Namespace) -> int:
     # Convenience: assess a role against its own applicant pool.
-    return _run_assessment(args.role, [args.role], "applicants")
+    return _run_assessment(
+        args.role, [args.role], "applicants", concurrency=args.concurrency,
+        force=args.force, dry_run=args.dry_run, limit=args.limit,
+    )
 
 
 def _cmd_score_file(args: argparse.Namespace) -> int:
@@ -165,6 +229,17 @@ def _cmd_draft_criteria(args: argparse.Namespace) -> int:
     return 0
 
 
+def _add_batch_flags(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--concurrency", type=int, default=8,
+                   help="Parallel API calls (default 8).")
+    p.add_argument("--force", action="store_true",
+                   help="Re-score résumés that already have results.")
+    p.add_argument("--dry-run", action="store_true",
+                   help="Show the preflight (counts + cost estimate) and stop.")
+    p.add_argument("--limit", type=int, default=None,
+                   help="Score at most N résumés (useful for a trial run).")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="dai-resumes", description="Score and rank résumés by role using Claude."
@@ -188,10 +263,12 @@ def build_parser() -> argparse.ArgumentParser:
         "Defaults to the role's own pool.",
     )
     p_assess.add_argument("--label", help="Results subfolder name (auto if omitted).")
+    _add_batch_flags(p_assess)
     p_assess.set_defaults(func=_cmd_assess)
 
     p_rank = sub.add_parser("rank", help="Assess a role against its own applicant pool.")
     p_rank.add_argument("role")
+    _add_batch_flags(p_rank)
     p_rank.set_defaults(func=_cmd_rank)
 
     p_file = sub.add_parser("score-file", help="Score a single résumé file.")

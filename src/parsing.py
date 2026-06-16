@@ -108,3 +108,29 @@ def _resolve_one(spec: str) -> tuple[str, List[Path]]:
     raise FileNotFoundError(
         f"Pool '{spec}' is not a known role, a directory, or a matching glob."
     )
+
+
+def _all_files(spec: str) -> List[Path]:
+    """Every file a pool spec points at, regardless of extension."""
+    if criteria_mod.is_role(spec):
+        folder = config.role_resume_dir(spec)
+        return [p for p in folder.iterdir() if p.is_file()] if folder.exists() else []
+    p = Path(spec)
+    if p.is_dir():
+        return [f for f in p.iterdir() if f.is_file()]
+    return [Path(m) for m in glob.glob(spec) if Path(m).is_file()]
+
+
+def unsupported(pools: List[str]) -> List[Path]:
+    """Files in the pools we can't parse (not .pdf/.docx, excluding .gitkeep)."""
+    out: List[Path] = []
+    seen: set[Path] = set()
+    for spec in pools:
+        for f in _all_files(spec):
+            if f.name == ".gitkeep" or f.suffix.lower() in config.SUPPORTED_EXTENSIONS:
+                continue
+            resolved = f.resolve()
+            if resolved not in seen:
+                seen.add(resolved)
+                out.append(f)
+    return out
