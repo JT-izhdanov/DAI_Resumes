@@ -1,0 +1,23 @@
+# Secrets
+.env
+
+# Generated scores & rankings
+results/
+
+# Real candidate résumés — keep personal data out of git.
+# Comment this out if you intend to version-control résumés in a PRIVATE repo.
+roles/**/resumes/*.pdf
+roles/**/resumes/*.docx
+roles/**/resumes/*.doc
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
